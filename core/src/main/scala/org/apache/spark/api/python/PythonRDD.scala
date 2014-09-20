@@ -339,18 +339,22 @@ private[spark] object PythonRDD extends Logging {
   def readRDDFromFile(sc: JavaSparkContext, filename: String, parallelism: Int):
   JavaRDD[Array[Byte]] = {
     val file = new DataInputStream(new FileInputStream(filename))
-    val objs = new collection.mutable.ArrayBuffer[Array[Byte]]
+    val empty = new collection.mutable.ArrayBuffer[Array[Byte]]
+    var rdd = JavaRDD.fromRDD(sc.sc.parallelize(empty, parallelism))
+
     try {
       while (true) {
         val length = file.readInt()
         val obj = new Array[Byte](length)
         file.readFully(obj)
         objs.append(obj)
+        val rddBatch = JavaRDD.fromRDD(sc.sc.parallelize(objs, parallelism))
+        rdd = rdd + rddBatch
       }
     } catch {
       case eof: EOFException => {}
     }
-    JavaRDD.fromRDD(sc.sc.parallelize(objs, parallelism))
+    rdd
   }
 
   def readBroadcastFromFile(sc: JavaSparkContext, filename: String): Broadcast[Array[Byte]] = {
